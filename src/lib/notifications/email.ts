@@ -11,8 +11,18 @@ const FROM = process.env.RESEND_FROM_EMAIL ?? 'noreply@slotfill.local'
 
 async function sendHtml({ to, subject, html }: MailPayload): Promise<void> {
   if (process.env.NODE_ENV !== 'production') {
-    const transport = nodemailer.createTransport({ host: 'localhost', port: 54400, secure: false })
-    await transport.sendMail({ from: FROM, to, subject, html })
+    try {
+      // Local Supabase Inbucket — only works when Docker + supabase start is running
+      const transport = nodemailer.createTransport({ host: 'localhost', port: 54400, secure: false })
+      await transport.sendMail({ from: FROM, to, subject, html })
+    } catch {
+      // Inbucket not running (no Docker). Print to terminal so dev can still test flows.
+      console.log('\n📧 [DEV EMAIL] ─────────────────────────────────────')
+      console.log(`  To:      ${to}`)
+      console.log(`  Subject: ${subject}`)
+      console.log(`  Body:    ${html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()}`)
+      console.log('────────────────────────────────────────────────────\n')
+    }
     return
   }
   await new Resend(process.env.RESEND_API_KEY).emails.send({ from: FROM, to, subject, html })

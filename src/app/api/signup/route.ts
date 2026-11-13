@@ -72,6 +72,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     )
 
   if (upsertError) {
+    console.error('[signup] pending_signups upsert failed:', upsertError)
     return NextResponse.json({ ok: false, error: 'Could not create account. Please try again.' }, { status: 500 })
   }
 
