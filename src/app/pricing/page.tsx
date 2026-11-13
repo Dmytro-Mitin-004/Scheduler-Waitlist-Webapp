@@ -69,7 +69,7 @@ const plans = [
       'Volume & annual discounts',
     ],
     cta: 'Contact sales',
-    href: '#',
+    href: 'mailto:hello@slotfill.io',
     highlight: false,
   },
 ]
@@ -198,9 +198,9 @@ export default function PricingPage() {
             <p className="mb-5 text-sm text-slate-400">
               We&apos;re happy to walk you through the product or help you pick the right plan.
             </p>
-            <span className="text-sm font-medium text-slate-500">
-              hello@example.com — placeholder, not monitored
-            </span>
+            <a href="mailto:hello@slotfill.io" className="text-sm font-medium text-blue-300 hover:text-blue-200">
+              hello@slotfill.io
+            </a>
           </div>
         </div>
       </section>

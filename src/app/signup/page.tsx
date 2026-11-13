@@ -74,7 +74,6 @@ function SignupPageContent() {
   const [cardCvv, setCardCvv] = useState('')
   const [payError, setPayError] = useState<string | null>(null)
   const [payLoading, setPayLoading] = useState(false)
-  const [demoSuccess, setDemoSuccess] = useState(false)
 
   const selectedPlan = PLANS.find(p => p.key === plan)!
 
@@ -119,35 +118,20 @@ function SignupPageContent() {
 
   async function handlePayment(event: FormEvent) {
     event.preventDefault()
-    setDemoSuccess(true)
+    setPayError(null)
+    setPayLoading(true)
+    const response = await fetch('/api/signup/complete-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentSession }),
+    })
+    const body = await response.json()
+    setPayLoading(false)
+    if (!response.ok || !body.ok) { setPayError(body.error ?? 'Payment failed. Please try again.'); return }
+    router.push('/about')
   }
 
   if (step === 'payment') {
-    if (demoSuccess) {
-      return (
-        <main className="relative min-h-screen flex items-center justify-center bg-[#090e1a] px-4">
-          <PageBg glow="indigo" />
-          <div className="relative z-10 w-full max-w-sm text-center">
-            <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-full border border-green-500/30 bg-green-500/15">
-              <span className="text-2xl text-green-400">✓</span>
-            </div>
-            <h1 className="mb-2 text-2xl font-bold tracking-tight text-white" style={{ letterSpacing: '-0.02em' }}>
-              You&apos;re on {selectedPlan.label}
-            </h1>
-            <p className="mb-1 text-sm text-slate-400">
-              Your account has been moved to the {selectedPlan.label} tier.
-            </p>
-            <p className="mb-7 text-xs text-amber-400/80">
-              Demo build — no charges apply.
-            </p>
-            <Button asChild className="w-full">
-              <Link href="/dashboard">Go to dashboard</Link>
-            </Button>
-          </div>
-        </main>
-      )
-    }
-
     return (
       <main className="relative min-h-screen flex items-center justify-center bg-[#090e1a] px-4 py-10">
         <PageBg glow="indigo" />
