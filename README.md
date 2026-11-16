@@ -2,7 +2,7 @@
 
 A web app that automatically fills calendar cancellations from a waitlist. When a business owner's appointment is cancelled, the system detects it, finds clients whose availability overlaps the freed slot, and emails them a one-click offer. First to confirm gets it.
 
-**[Live Demo](scheduler-waitlist-webapp.vercel.app)**
+**[Live Demo](https://scheduler-waitlist-webapp.vercel.app)**
 
 > [!IMPORTANT]
 > **The live demo cannot demonstrate the core auto-fill flow end-to-end.** The slot detection and email dispatch run on a cron job — Vercel's free tier limits this to once per day, and it also requires a live Google Calendar connection. What you *can* explore is the full UI: both dashboards, the waitlist management, and the confirm/decline page. The interesting parts (interval-overlap matching, CAS confirm, encrypted OAuth tokens) are in the backend logic under `src/lib/cron/` and `src/lib/confirm/`.
@@ -31,9 +31,6 @@ Password: Demo1234!
 ```
 
 The demo business has Google Calendar sync disabled, so nothing auto-fires. But all the UI is fully functional — you can add/remove waitlist entries, view pending offers, and walk through the confirm/decline flow.
-
-> [!WARNING]
-> **The demo works without Google OAuth or Resend configured.** Without Google OAuth, connecting a new business to Google Calendar will fail — the demo account is pre-set to `disconnected` so this doesn't affect it. Without Resend, slot offer emails won't send — the confirm/decline page still works if navigated to directly. For a UI walkthrough these limitations are invisible.
 
 ---
 
@@ -93,25 +90,50 @@ Schema: [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
 
 ## Running locally
 
-You'll need Node 18+, a Supabase project, and (for calendar sync) a Google Cloud project with the Calendar API enabled.
+**Requirements:** Node.js 18+
 
 ```bash
 git clone https://github.com/Trexicurity07/Scheduler-Waitlist-Webapp.git
 cd Scheduler-Waitlist-Webapp
 npm install
-cp .env.example .env.local   # fill in your values
+cp .env.example .env.local
 ```
 
-Run the migration in the Supabase SQL editor (`supabase/migrations/0001_init.sql`), then:
+### Credentials
 
-```bash
-npm run dev
+You need a **Supabase project** (free tier works). Create one at [supabase.com](https://supabase.com), then fill these into `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=        # Project URL from Supabase dashboard
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # Anon/public key
+SUPABASE_SERVICE_ROLE_KEY=       # Service role key (Settings → API)
+REFRESH_TOKEN_ENCRYPTION_KEY=    # Any 32-byte base64 string — generate with:
+                                 # node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+CRON_SECRET=                     # Any random string — used to authenticate cron calls
 ```
 
-To seed the demo accounts against your local Supabase instance:
+The remaining credentials are **optional** — the core UI works without them:
+
+| Credential | Purpose | Get it from |
+|---|---|---|
+| `RESEND_API_KEY` + `RESEND_FROM_EMAIL` | Sending slot-offer emails | [resend.com](https://resend.com) (free tier) |
+| `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET` | Connecting a Google Calendar | [Google Cloud Console](https://console.cloud.google.com) → Credentials → OAuth 2.0 |
+
+### Database and seed
+
+Run the migration in the Supabase SQL editor:
+
+```
+supabase/migrations/0001_init.sql
+```
+
+Then seed the demo accounts:
 
 ```bash
 npm run seed:demo
+npm run dev
+# App runs on http://localhost:3000
 ```
 
 ---
