@@ -19,27 +19,33 @@ async function seed() {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // ── 1. Demo owner (Supabase Auth) ──────────────────────────────────────────
-  const { data: { users }, error: listErr } = await supabase.auth.admin.listUsers()
-  if (listErr) throw listErr
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12)
+
+  // ── 1. Demo owner (owner_profiles — custom auth, no Supabase Auth user needed) ─
+  const { data: existingOwner } = await supabase
+    .from('owner_profiles')
+    .select('auth_user_id')
+    .eq('email', OWNER_EMAIL)
+    .maybeSingle()
 
   let ownerId: string
-  const existingOwner = users.find(u => u.email === OWNER_EMAIL)
   if (existingOwner) {
-    console.log('Demo owner already exists:', existingOwner.id)
-    ownerId = existingOwner.id
+    ownerId = existingOwner.auth_user_id
+    console.log('Demo owner already exists:', ownerId)
   } else {
-    const { data, error } = await supabase.auth.admin.createUser({
+    ownerId = randomUUID()
+    const { error } = await supabase.from('owner_profiles').insert({
+      auth_user_id: ownerId,
+      business_name: 'Demo Wellness Studio',
       email: OWNER_EMAIL,
-      password: DEMO_PASSWORD,
-      email_confirm: true,
+      password_hash: passwordHash,
+      plan_tier: 'starter',
     })
     if (error) throw error
-    ownerId = data.user.id
     console.log('Created demo owner:', ownerId)
   }
 
-  // ── 2. Demo business ───────────────────────────────────────────────────────
+  // ── 2. Demo business ───────────────────────────────────────────────────────────
   const placeholderToken = encrypt('placeholder-refresh-token')
 
   const { data: bizRow, error: bizErr } = await supabase
@@ -55,6 +61,7 @@ async function seed() {
         google_refresh_token_encrypted: placeholderToken,
         dedicated_calendar_id: 'demo_calendar_id',
         calendar_status: 'disconnected',
+        business_type: 'wellness',
         batch_size: 3,
         batch_interval_minutes: 30,
         min_notice_hours: 24,
@@ -68,7 +75,7 @@ async function seed() {
   const businessId = bizRow.id
   console.log('Demo business upserted:', businessId)
 
-  // ── 3. Demo client (custom auth via client_profiles) ───────────────────────
+  // ── 3. Demo client (client_profiles — custom auth, no Supabase Auth user) ──────
   const { data: existingProfile } = await supabase
     .from('client_profiles')
     .select('user_id')
@@ -81,19 +88,18 @@ async function seed() {
     console.log('Demo client profile already exists:', clientProfileId)
   } else {
     clientProfileId = randomUUID()
-    const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12)
-    const { error: profileErr } = await supabase.from('client_profiles').insert({
+    const { error } = await supabase.from('client_profiles').insert({
       user_id: clientProfileId,
       email: CLIENT_EMAIL,
       name: 'Demo Client',
       phone: '+441234567890',
       password_hash: passwordHash,
     })
-    if (profileErr) throw profileErr
+    if (error) throw error
     console.log('Created demo client profile:', clientProfileId)
   }
 
-  // ── 4. Link client to demo business (clients join table) ───────────────────
+  // ── 4. Link client to demo business ───────────────────────────────────────────
   const { data: existingClient } = await supabase
     .from('clients')
     .select('id')
@@ -106,17 +112,17 @@ async function seed() {
     clientId = existingClient.id
     console.log('Demo client row already exists:', clientId)
   } else {
-    const { data: newClient, error: clientErr } = await supabase
+    const { data: newClient, error } = await supabase
       .from('clients')
       .insert({ user_id: clientProfileId, business_id: businessId })
       .select('id')
       .single()
-    if (clientErr) throw clientErr
+    if (error) throw error
     clientId = newClient.id
     console.log('Created demo client row:', clientId)
   }
 
-  // ── 5. Active waitlist entry (Mon/Wed/Fri mornings) ────────────────────────
+  // ── 5. Active waitlist entry (Mon/Wed/Fri mornings) ───────────────────────────
   const { data: existingEntry1 } = await supabase
     .from('waitlist_entries')
     .select('id')
@@ -130,7 +136,7 @@ async function seed() {
     entry1Id = existingEntry1.id
     console.log('Demo waitlist entry 1 already exists:', entry1Id)
   } else {
-    const { data: e1, error: e1Err } = await supabase
+    const { data: e1, error } = await supabase
       .from('waitlist_entries')
       .insert({
         business_id: businessId,
@@ -141,17 +147,16 @@ async function seed() {
           { day: 'Friday', start: '09:00', end: '12:00' },
         ],
         status: 'active',
-        verified_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .select('id')
       .single()
-    if (e1Err) throw e1Err
+    if (error) throw error
     entry1Id = e1.id
     console.log('Created demo waitlist entry 1:', entry1Id)
   }
 
-  // ── 6. Second active entry (Tue/Thu afternoons) ────────────────────────────
+  // ── 6. Second active entry (Tue/Thu afternoons) ───────────────────────────────
   const { data: existingEntry2 } = await supabase
     .from('waitlist_entries')
     .select('id')
@@ -162,7 +167,7 @@ async function seed() {
     .maybeSingle()
 
   if (!existingEntry2) {
-    const { error: e2Err } = await supabase.from('waitlist_entries').insert({
+    const { error } = await supabase.from('waitlist_entries').insert({
       business_id: businessId,
       client_id: clientId,
       time_windows: [
@@ -170,16 +175,15 @@ async function seed() {
         { day: 'Thursday', start: '14:00', end: '18:00' },
       ],
       status: 'active',
-      verified_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
     })
-    if (e2Err) throw e2Err
+    if (error) throw error
     console.log('Created demo waitlist entry 2')
   } else {
     console.log('Demo waitlist entry 2 already exists')
   }
 
-  // ── 7. Pending slot offer notification ─────────────────────────────────────
+  // ── 7. Pending slot offer notification ────────────────────────────────────────
   const { data: existingNotif } = await supabase
     .from('notifications')
     .select('id')
@@ -189,7 +193,7 @@ async function seed() {
     .maybeSingle()
 
   if (!existingNotif) {
-    const { error: notifErr } = await supabase.from('notifications').insert({
+    const { error } = await supabase.from('notifications').insert({
       waitlist_entry_id: entry1Id,
       appointment_id: null,
       type: 'slot_offer',
@@ -198,7 +202,7 @@ async function seed() {
       token: 'demo-offer-token-' + randomUUID(),
       batch_number: 1,
     })
-    if (notifErr) throw notifErr
+    if (error) throw error
     console.log('Created demo slot offer notification')
   } else {
     console.log('Demo notification already exists')
